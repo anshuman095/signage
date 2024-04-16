@@ -25,6 +25,10 @@ export class CreateUserDto {
   @IsEmail()
   email: string;
 
+  phone_number: number;
+
+  confirm_password: string;
+
   @IsNotEmpty()
   @IsString()
   @MinLength(5)

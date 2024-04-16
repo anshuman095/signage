@@ -29,6 +29,9 @@ export class UserEntity {
   @Column({ type: 'varchar', nullable: true })
   password: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  phone_number: number;
+
   @Column({ type: 'boolean', default: false, nullable: true })
   isEmailVerified: boolean;
 

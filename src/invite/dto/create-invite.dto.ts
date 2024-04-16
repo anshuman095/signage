@@ -1,18 +1,10 @@
-// import { IsNotEmpty, IsString } from 'class-validator';
-
-import { BoardEntity } from 'src/board/entities/board.entity';
-
 export enum Status {
   PENDING = 'PENDING',
   CONFIRM = 'CONFIRM',
 }
 
 export class CreateInviteDto {
-  board_id: BoardEntity;
-
-  board: number;
-
-  user: number;
+  board_id: number;
 
   user_email: string;
 

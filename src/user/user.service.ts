@@ -41,11 +41,12 @@ export class UserService {
 
       const userData = await this.userRepository.save(createdUser);
 
-      const verificationLink = `${process.env.VERIFICATION_URL}?token=${token}`;
+      const verificationLink = `${process.env.VERIFICATION_URL}`;
 
       const emailData = {
         subject: 'Email Verification',
-        html: `Please click the following link to verify your email: ${createUserDto.email} <a href="${verificationLink}">${verificationLink}</a>`,
+        html: `Please click the following link to verify your email: ${createUserDto.email} <a href="${verificationLink}?token=${token}">
+        ${verificationLink}</a>`,
       };
       await this.emailService.sendEmail(createUserDto.email, emailData);
       delete userData.password;

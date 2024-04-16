@@ -30,6 +30,9 @@ export class UserController {
     @Res() res: Response,
   ) {
     try {
+      if (createUserDto.password !== createUserDto.confirm_password) {
+        throw new Error('Password and confirm password does not match');
+      }
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
       createUserDto.password = hashedPassword;

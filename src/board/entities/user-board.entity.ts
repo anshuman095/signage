@@ -27,16 +27,7 @@ export class UserBoardEntity {
   is_active: boolean;
 
   @Column({ type: 'varchar', nullable: true, default: false })
-  status: boolean;
-
-  @Column({ type: 'varchar', nullable: true })
-  board: number;
-
-  @Column({ type: 'varchar', unique: true, nullable: true })
-  user: number;
-
-  @Column()
-  expiry_time: Date;
+  status: string;
 
   @CreateDateColumn()
   created_at: Date;

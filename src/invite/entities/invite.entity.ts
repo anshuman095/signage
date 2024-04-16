@@ -38,10 +38,7 @@ export class InviteEntity {
   is_active: boolean;
 
   @Column({ type: 'varchar', nullable: true })
-  board: number;
-
-  @Column({ type: 'varchar', unique: true, nullable: true })
-  user: number;
+  invitation_url: string;
 
   @Column()
   expiry_time: Date;
