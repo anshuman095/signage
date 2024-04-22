@@ -8,4 +8,8 @@ export class CreateBoardDto {
   logo: string;
 
   description: string;
+
+  userId: number;
+
+  user_email: string;
 }

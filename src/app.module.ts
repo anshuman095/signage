@@ -11,6 +11,11 @@ import { AppService } from './app.service';
 import { InviteModule } from './invite/invite.module';
 import { UserBoardEntity } from './board/entities/user-board.entity';
 import { InviteEntity } from './invite/entities/invite.entity';
+import { CartModule } from './cart/cart.module';
+import { BoardFlowEntity } from './board/entities/board-flow.entity';
+import { LabelEntity } from './cart/entities/label.entity';
+import { UserTimeTrackerEntity } from './cart/entities/user-time-tracker.entity';
+import { CartEntity } from './cart/entities/cart.entity';
 
 @Module({
   imports: [
@@ -22,13 +27,23 @@ import { InviteEntity } from './invite/entities/invite.entity';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_DATABASE,
-      entities: [UserEntity, BoardEntity, UserBoardEntity, InviteEntity],
+      entities: [
+        UserEntity,
+        BoardEntity,
+        UserBoardEntity,
+        InviteEntity,
+        BoardFlowEntity,
+        CartEntity,
+        LabelEntity,
+        UserTimeTrackerEntity,
+      ],
       synchronize: true,
     }),
     UserModule,
     BoardModule,
     AuthModule,
     InviteModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],

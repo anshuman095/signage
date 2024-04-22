@@ -1,23 +1,20 @@
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { Response } from 'express';
-// import { Request } from 'express';
 import {
   Controller,
   Get,
   Post,
   Body,
-  // Patch,
   Param,
   Delete,
   ValidationPipe,
-  // Req,
   Res,
   Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-// import { UpdateUserDto } from './dto/update-user.dto';
+// import { UpdateUserDto } from "./dto/update-user.dto";
 import { CreateLoginDto } from './dto/create-login.dto';
 
 @Controller('/user')
@@ -100,6 +97,38 @@ export class UserController {
     }
   }
 
+  @Get('/search')
+  async searchUserByEmail(@Query('email') email: string, @Res() res: Response) {
+    try {
+      if (!email || email.length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email query must be at least 3 characters long',
+        });
+      }
+
+      const users = await this.userService.searchUsersByEmail(email);
+
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No results found',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Users found successfully',
+        result: users,
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+
   @Get()
   findAll() {
     return this.userService.findAll();
@@ -110,8 +139,8 @@ export class UserController {
     return this.userService.findOne(+id);
   }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  // @Patch(":id")
+  // update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
   //   return this.userService.update(+id, updateUserDto);
   // }
 

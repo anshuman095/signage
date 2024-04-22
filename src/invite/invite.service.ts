@@ -6,7 +6,7 @@ import { InviteEntity, Status } from './entities/invite.entity';
 import { EmailService } from 'src/utility/email.service';
 import { UserBoardEntity } from 'src/board/entities/user-board.entity';
 import { BoardEntity } from 'src/board/entities/board.entity';
-import { UserEntity } from 'src/user/entities/user.entity';
+import { StatusUser, UserEntity } from 'src/user/entities/user.entity';
 
 @Injectable()
 export class InviteService {
@@ -23,6 +23,9 @@ export class InviteService {
     @InjectRepository(BoardEntity)
     private boardRepository: Repository<BoardEntity>,
 
+    @InjectRepository(BoardEntity)
+    private boardUserBoardRepository: Repository<BoardEntity>,
+
     private readonly emailService: EmailService,
   ) {}
 
@@ -34,7 +37,6 @@ export class InviteService {
         boardId: createInviteDto.board_id,
       })
       .getOne();
-    console.log('user_board', user_board);
 
     const board = await this.boardRepository.findOneBy({
       id: createInviteDto.board_id,
@@ -48,16 +50,13 @@ export class InviteService {
         .andWhere('invite.status = :status', { status: Status.PENDING })
         .andWhere('invite.is_active = :isActive', { isActive: true })
         .getOne();
-      console.log('invite--->', invite);
 
       const invitationLink = `${process.env.INVITATION_URL}`;
-      console.log('process.env.INVITATION_URL', process.env.INVITATION_URL);
 
       if (!invite) {
         const expiryTime = new Date();
         expiryTime.setDate(expiryTime.getDate() + 1);
 
-        console.log('user-->', user);
         const created_invite = this.inviteRepository.create({
           board_id: board,
           user_id: user.id,
@@ -66,14 +65,16 @@ export class InviteService {
           is_active: true,
           expiry_time: expiryTime,
         });
-
         const newInvite = await this.inviteRepository.save(created_invite);
+
+        user.status = StatusUser.PENDING;
+        await this.userRepository.save(user);
+
         const emailData = {
           subject: 'Invitation',
           html: `Please click the following link to accept the invitation <a href="${invitationLink}?inviteId=${newInvite.id}&user_id=${user.id}
           &user_email=${user.email}&board=${createInviteDto.board_id}">${invitationLink}</a> and this invitation link will expire on ${expiryTime}`,
         };
-        console.log('emailData-->', emailData);
         await this.emailService.sendEmail(user.email || user, emailData);
         newInvite.invitation_url = emailData.html;
         await this.inviteRepository.save(newInvite);
@@ -120,13 +121,20 @@ export class InviteService {
     user_id: number,
     user_email: string,
     board_id: number,
-  ): Promise<InviteEntity> {
+  ) {
     const invite = await this.inviteRepository.findOne({
       where: { id: inviteId },
     });
 
+    const user = await this.userRepository.findOne({
+      where: { email: invite.user_email },
+    });
+
     if (!invite) {
       throw new Error('Invitation not found');
+    }
+    if (user.id !== user_id) {
+      throw new Error('Invalid userId');
     }
     if (invite.user_email !== user_email) {
       throw new Error('Invalid email');
@@ -139,10 +147,14 @@ export class InviteService {
 
     const board = await this.boardRepository.findOne({
       where: { id: board_id },
+      relations: ['users'],
     });
-    const user = await this.userRepository.findOne({
-      where: { id: user_id },
-    });
+    if (!board) {
+      throw new Error('Board not found');
+    }
+    board.users = [...board.users, user];
+    await this.boardRepository.save(board);
+
     const user_board = this.userBoardRepository.create({
       is_active: true,
       status: 'active',
@@ -150,6 +162,8 @@ export class InviteService {
       user_id: user,
     });
     await this.userBoardRepository.save(user_board);
+    user.status = StatusUser.ACTIVE;
+    await this.userRepository.save(user);
 
     return confirm_new_invite;
   }

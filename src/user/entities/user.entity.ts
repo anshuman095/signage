@@ -1,7 +1,10 @@
+import { BoardEntity } from 'src/board/entities/board.entity';
+import { CartEntity } from 'src/cart/entities/cart.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  ManyToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -10,6 +13,12 @@ export enum Role {
   SUPERADMIN = 'SUPERADMIN',
   ADMIN = 'ADMIN',
   USER = 'USER',
+}
+
+export enum StatusUser {
+  INACTIVE = 'INACTIVE',
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE',
 }
 
 @Entity('users')
@@ -30,16 +39,30 @@ export class UserEntity {
   password: string;
 
   @Column({ type: 'varchar', nullable: true })
-  phone_number: number;
+  phone_number: string;
 
   @Column({ type: 'boolean', default: false, nullable: true })
   isEmailVerified: boolean;
 
+  @Column({
+    type: 'enum',
+    nullable: true,
+    default: StatusUser.INACTIVE,
+    enum: StatusUser,
+  })
+  status: StatusUser;
+
   @Column({ type: 'varchar', nullable: true })
   emailVerificationToken: string;
 
-  @Column({ type: 'enum', nullable: true, enum: Role })
+  @Column({ type: 'enum', nullable: true, enum: Role, default: Role.USER })
   role: Role;
+
+  @ManyToMany(() => BoardEntity, (board) => board.users)
+  boards: BoardEntity;
+
+  @ManyToMany(() => CartEntity, (cart) => cart.members)
+  cart_members: CartEntity;
 
   @CreateDateColumn()
   created_at: Date;

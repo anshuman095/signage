@@ -12,5 +12,6 @@ import { EmailService } from 'src/utility/email.service';
   imports: [TypeOrmModule.forFeature([InviteEntity]), UserModule, BoardModule],
   controllers: [InviteController],
   providers: [InviteService, AuthService, EmailService],
+  exports: [TypeOrmModule.forFeature([InviteEntity])],
 })
 export class InviteModule {}

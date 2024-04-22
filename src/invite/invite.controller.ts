@@ -2,9 +2,9 @@ import { Response } from 'express';
 import { Controller, Post, Body, Query, Res, UseGuards } from '@nestjs/common';
 import { InviteService } from './invite.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
-import { Roles } from 'src/decorators/roles.decorators';
+// import { Roles } from 'src/decorators/roles.decorators';
 import { AuthenticationGuard } from 'src/auth/authentication.guard';
-import { AuthorizationGuard } from 'src/auth/authorization.guard';
+// import { AuthorizationGuard } from 'src/auth/authorization.guard';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from 'src/user/entities/user.entity';
@@ -20,8 +20,8 @@ export class InviteController {
     private readonly emailService: EmailService,
   ) {}
 
-  @Roles(['SUPERADMIN'])
-  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  // @Roles(['SUPERADMIN'])
+  @UseGuards(AuthenticationGuard)
   @Post()
   async create(
     @Body() createInviteDto: CreateInviteDto,
@@ -33,11 +33,7 @@ export class InviteController {
       if (userId) {
         const user = await this.userRepository.findOneBy({ id: userId });
         if (user) {
-          await this.inviteService.sendInvitation(
-            createInviteDto,
-            user,
-            // userId,
-          );
+          await this.inviteService.sendInvitation(createInviteDto, user);
           return res.status(201).json({
             success: true,
             message: 'Invitation sent successfully!',

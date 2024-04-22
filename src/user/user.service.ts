@@ -45,8 +45,8 @@ export class UserService {
 
       const emailData = {
         subject: 'Email Verification',
-        html: `Please click the following link to verify your email: ${createUserDto.email} <a href="${verificationLink}?token=${token}">
-        ${verificationLink}</a>`,
+        html: `Please click the following link to verify your email: ${createUserDto.email} <a href="${verificationLink}?token=${token}">${verificationLink}
+        </a>`,
       };
       await this.emailService.sendEmail(createUserDto.email, emailData);
       delete userData.password;
@@ -58,13 +58,18 @@ export class UserService {
     const user = await this.userRepository.findOne({
       where: { email: createLogionDto.email },
     });
+    // if(user.isEmailVerified === false) {
+    //   throw new Error("Email is not verified")
+    // }
 
     if (user) {
       const { password } = user;
+
       const checkPassword = await bcrypt.compare(
         createLogionDto.password,
         password,
       );
+
       if (checkPassword) {
         const payload = {
           id: user.id,
@@ -72,6 +77,7 @@ export class UserService {
           role: user.role,
         };
         const token = jwt.sign(payload, process.env.JWT_SECRET_KEY);
+        delete user.password;
         return { token, user };
       } else {
         throw new Error('Incorrect email or password');
@@ -81,13 +87,12 @@ export class UserService {
     }
   }
 
-  generateResetToken(email: string): string {
-    const payload = { email };
-    return jwt.sign(payload, process.env.RESET_SECRET_KEY, { expiresIn: '5m' });
-  }
-
-  verifyResetToken(token: string): { email: string } {
-    return jwt.verify(token, process.env.RESET_SECRET_KEY) as { email: string };
+  async searchUsersByEmail(email: string) {
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.email LIKE :email', { email: `%${email}%` })
+      .getMany();
+    return users;
   }
 
   findAll() {

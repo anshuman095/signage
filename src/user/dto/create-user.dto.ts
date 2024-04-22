@@ -1,6 +1,8 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
+  IsPhoneNumber,
   IsString,
   Matches,
   MinLength,
@@ -11,7 +13,6 @@ export enum Role {
   ADMIN = 'ADMIN',
   USER = 'USER',
 }
-
 export class CreateUserDto {
   @IsNotEmpty()
   @IsString()
@@ -25,7 +26,9 @@ export class CreateUserDto {
   @IsEmail()
   email: string;
 
-  phone_number: number;
+  @IsOptional()
+  @IsPhoneNumber('IN')
+  phone_number: string;
 
   confirm_password: string;
 
