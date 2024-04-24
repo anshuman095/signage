@@ -272,4 +272,20 @@ export class CartController {
       });
     }
   }
+
+  @Get('/getAllCart')
+  async getAllCart(@Res() res: Response) {
+    try {
+      const cart = await this.cartService.getAllCart();
+      return res.status(200).json({
+        success: true,
+        message: cart,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 }

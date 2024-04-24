@@ -246,6 +246,21 @@ export class CartService {
         where: { id: user_id },
       });
 
+      const checklistExist = await this.cartChecklistRepository.findOne({
+        where: { checklist_title: createCartChecklistDto.checklist_title },
+        relations: ['checklist_users'],
+      });
+
+      if (checklistExist) {
+        checklistExist.checklist_users = [
+          ...checklistExist.checklist_users,
+          user,
+        ];
+        const checklistExistData =
+          await this.cartChecklistRepository.save(checklistExist);
+        return checklistExistData;
+      }
+
       const newChecklist = this.cartChecklistRepository.create({
         ...createCartChecklistDto,
         cart_id: cart,
@@ -276,7 +291,28 @@ export class CartService {
         where: { id: checklistId },
         relations: ['checklist_users'],
       });
+      if (!checklist) {
+        throw new Error('Checklist does not exist');
+      }
       return checklist;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getAllCart() {
+    try {
+      const cart = await this.cartRepository.find({
+        relations: [
+          'created_by',
+          'updated_by',
+          'board_id',
+          'members',
+          'checklists',
+          'checklists.checklist_users',
+        ],
+      });
+      return cart;
     } catch (error) {
       throw new Error(error.message);
     }
