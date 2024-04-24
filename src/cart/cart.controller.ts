@@ -10,6 +10,7 @@ import {
   Req,
   Res,
   UseGuards,
+  Query,
   // UseInterceptors,
   // UploadedFile,
 } from '@nestjs/common';
@@ -20,6 +21,8 @@ import { AddMemberDto } from './dto/add-member.dto';
 // import { FileInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { UserTimeTrackerDto } from './dto/user-time-tracker.dto';
+import { CreateLabelDto } from './dto/create-label.dto';
+import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto ';
 // import { UpdateCartDto } from './dto/update-cart.dto';
 
 interface CustomRequest extends Request {
@@ -62,6 +65,41 @@ export class CartController {
     }
   }
 
+  @Post('/create/label')
+  async createLabel(
+    @Body() createLabelDto: CreateLabelDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const label = await this.cartService.createLabel(createLabelDto);
+      return res.status(201).json({
+        success: true,
+        message: label,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getLabel')
+  async getLabel(@Body() createLabelDto: CreateLabelDto, @Res() res: Response) {
+    try {
+      const label = await this.cartService.getLabel();
+      return res.status(201).json({
+        success: true,
+        message: label,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
   @Get()
   findAll() {
     return this.cartService.findAll();
@@ -82,10 +120,14 @@ export class CartController {
     return this.cartService.remove(+id);
   }
 
-  @Get('/getMembersInCart/:cartId')
-  async getMembers(@Param('cartId') cartId: number, @Res() res: Response) {
+  @Get('/getMembersInBoard/:boardId')
+  async getMembersInABoard(
+    @Param('boardId') boardId: number,
+    @Query('email') email: string,
+    @Res() res: Response,
+  ) {
     try {
-      const members = await this.cartService.getMembersInCart(cartId);
+      const members = await this.cartService.getMembersInBoard(boardId, email);
       return res.status(200).json({
         success: true,
         message: members,
@@ -109,6 +151,25 @@ export class CartController {
       return res.status(201).json({
         success: true,
         message: 'Member added successfully!',
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getMembersInCart/:cartId')
+  async getMembersInACart(
+    @Param('cartId') cartId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      const members = await this.cartService.getMembersInCart(cartId);
+      return res.status(200).json({
+        success: true,
+        message: members,
       });
     } catch (error) {
       return res.status(400).json({
@@ -147,6 +208,62 @@ export class CartController {
       return res.status(201).json({
         success: true,
         message: 'Member added successfully!',
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getCartById/:cartId')
+  async getCartById(@Param('cartId') cartId: number, @Res() res: Response) {
+    try {
+      const cart = await this.cartService.getCartById(cartId);
+      return res.status(200).json({
+        success: true,
+        message: cart,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Post('/addChecklist')
+  async addChecklistIntoCart(
+    @Body() createCartChecklistDto: CreateCartChecklistDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const checklist = await this.cartService.addChecklistIntoCart(
+        createCartChecklistDto,
+      );
+      return res.status(201).json({
+        success: true,
+        message: checklist,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getChecklistById/:checklistId')
+  async getChecklistById(
+    @Param('checklistId') checklistId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      const checklist = await this.cartService.getChecklistById(checklistId);
+      return res.status(200).json({
+        success: true,
+        message: checklist,
       });
     } catch (error) {
       return res.status(400).json({

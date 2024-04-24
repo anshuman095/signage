@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { LabelEntity } from './label.entity';
 import { BoardEntity } from 'src/board/entities/board.entity';
+import { CartChecklistEntity } from './cart-checklist.entity';
 
 @Entity('cart')
 export class CartEntity {
@@ -41,6 +42,16 @@ export class CartEntity {
   })
   @JoinTable({ name: 'cart_users' })
   members: UserEntity[];
+
+  @ManyToMany(
+    () => CartChecklistEntity,
+    (cartCheckList) => cartCheckList.cart,
+    {
+      cascade: true,
+    },
+  )
+  @JoinTable({ name: 'cart_checklists_cart' })
+  checklists: CartChecklistEntity[];
 
   @ManyToOne(() => LabelEntity, (label) => label.id)
   @JoinColumn({ name: 'label_id', referencedColumnName: 'id' })

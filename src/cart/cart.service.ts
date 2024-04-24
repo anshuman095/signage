@@ -9,12 +9,22 @@ import { UserTimeTrackerEntity } from './entities/user-time-tracker.entity';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UserTimeTrackerDto } from './dto/user-time-tracker.dto';
+import { LabelEntity } from './entities/label.entity';
+import { CreateLabelDto } from './dto/create-label.dto';
+import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto ';
+import { CartChecklistEntity } from './entities/cart-checklist.entity';
 
 @Injectable()
 export class CartService {
   constructor(
     @InjectRepository(CartEntity)
     private cartRepository: Repository<CartEntity>,
+
+    @InjectRepository(LabelEntity)
+    private labelRepository: Repository<LabelEntity>,
+
+    @InjectRepository(CartChecklistEntity)
+    private cartChecklistRepository: Repository<CartChecklistEntity>,
 
     @InjectRepository(UserTimeTrackerEntity)
     private userTimeTrackerRepository: Repository<UserTimeTrackerEntity>,
@@ -34,7 +44,6 @@ export class CartService {
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
-      console.log('userId', userId);
       const newCart = this.cartRepository.create({
         ...createCartDto,
         board_id: board_id,
@@ -42,6 +51,26 @@ export class CartService {
       });
       const cart = await this.cartRepository.save(newCart);
       return cart;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async createLabel(createLabelDto: CreateLabelDto) {
+    try {
+      const newLabel = this.labelRepository.create(createLabelDto);
+      const label = await this.labelRepository.save(newLabel);
+      // await this.c
+      return label;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getLabel() {
+    try {
+      const label = await this.labelRepository.find();
+      return label;
     } catch (error) {
       throw new Error(error.message);
     }
@@ -63,17 +92,28 @@ export class CartService {
     return `This action removes a #${id} cart`;
   }
 
-  async getMembersInCart(cartId: number) {
+  async getMembersInBoard(boardId: number, email: string) {
     try {
-      const cart = await this.cartRepository.findOne({
-        where: { id: cartId },
-        relations: ['board_id'],
-      });
-      const { users } = await this.boardRepository.findOne({
-        where: { id: cart.board_id.id },
-        relations: ['users'],
-      });
+      const { users } = await this.boardRepository
+        .createQueryBuilder('board')
+        .leftJoinAndSelect('board.users', 'users')
+        .where('board.id = :id', { id: boardId })
+        .andWhere('users.email LIKE :email', { email: `%${email}%` })
+        .getOne();
+
       return users;
+      // let query = this.boardRepository
+      //   .createQueryBuilder("board")
+      //   .leftJoinAndSelect("board.users", "users")
+      //   .where("board.id = :id", { id: boardId });
+
+      // if (email) {
+      //   query = query.andWhere("users.email LIKE :email", {
+      //     email: `%${email}%`,
+      //   });
+      // }
+      // const { users } = await query.getOne();
+      // return users;
     } catch (error) {
       throw new Error(error.message);
     }
@@ -116,17 +156,31 @@ export class CartService {
     }
   }
 
+  async getMembersInCart(cartId: number) {
+    try {
+      const query = await this.cartRepository
+        .createQueryBuilder('cart')
+        .leftJoinAndSelect('cart.members', 'members')
+        .where('cart.id = :id', { id: cartId })
+        .getOne();
+
+      const { members } = query;
+      return members;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
   async startTime(userTimeTrackerDto: UserTimeTrackerDto) {
     try {
       const { cart_id, user_id, board_id } = userTimeTrackerDto;
-      const cart = await this.userTimeTrackerRepository.findOne({
+      await this.userTimeTrackerRepository.findOne({
         where: {
           cart_id: { id: cart_id },
           user_id: { id: user_id },
           board_id: { id: board_id },
         },
       });
-      console.log('cart-->', cart);
     } catch (error) {
       throw new Error(error.message);
     }
@@ -134,7 +188,95 @@ export class CartService {
 
   async endTime(userTimeTrackerDto: UserTimeTrackerDto) {
     try {
-      const { cart_id, user_id, board_id } = userTimeTrackerDto;
+      console.log(userTimeTrackerDto);
+      // const { cart_id, user_id, board_id } = userTimeTrackerDto;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getCartById(cartId: number) {
+    try {
+      const cart = await this.cartRepository.findOne({
+        where: { id: cartId },
+        relations: [
+          'created_by',
+          'updated_by',
+          'board_id',
+          'members',
+          'checklists',
+          'checklists.checklist_users',
+        ],
+      });
+      delete cart.created_by.password;
+      if (cart.updated_by) {
+        delete cart.updated_by.password;
+      }
+
+      cart.members.map((members) => {
+        delete members.password;
+      });
+      return cart;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async addChecklistIntoCart(createCartChecklistDto: CreateCartChecklistDto) {
+    try {
+      const { user_id, cart_id } = createCartChecklistDto;
+
+      const cart = await this.cartRepository.findOne({
+        where: { id: cart_id },
+        relations: ['members', 'checklists'],
+      });
+
+      let userExist = false;
+      for (let i = 0; i < cart.members.length; i++) {
+        if (cart.members[i].id === user_id) {
+          userExist = true;
+          break;
+        }
+      }
+      if (!userExist) {
+        throw new Error('User does not exist in cart');
+      }
+
+      const user = await this.userRepository.findOne({
+        where: { id: user_id },
+      });
+
+      const newChecklist = this.cartChecklistRepository.create({
+        ...createCartChecklistDto,
+        cart_id: cart,
+      });
+      const checklist = await this.cartChecklistRepository.save(newChecklist);
+
+      const checklistDetails = await this.cartChecklistRepository.findOne({
+        where: { id: checklist.id },
+        relations: ['checklist_users'],
+      });
+      checklistDetails.checklist_users = [
+        ...checklistDetails.checklist_users,
+        user,
+      ];
+      await this.cartChecklistRepository.save(checklistDetails);
+
+      cart.checklists = [...cart.checklists, checklist];
+      await this.cartRepository.save(cart);
+      return checklist;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getChecklistById(checklistId: number) {
+    try {
+      const checklist = await this.cartChecklistRepository.findOne({
+        where: { id: checklistId },
+        relations: ['checklist_users'],
+      });
+      return checklist;
     } catch (error) {
       throw new Error(error.message);
     }

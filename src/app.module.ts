@@ -16,6 +16,7 @@ import { BoardFlowEntity } from './board/entities/board-flow.entity';
 import { LabelEntity } from './cart/entities/label.entity';
 import { UserTimeTrackerEntity } from './cart/entities/user-time-tracker.entity';
 import { CartEntity } from './cart/entities/cart.entity';
+import { CartChecklistEntity } from './cart/entities/cart-checklist.entity';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { CartEntity } from './cart/entities/cart.entity';
         BoardFlowEntity,
         CartEntity,
         LabelEntity,
+        CartChecklistEntity,
         UserTimeTrackerEntity,
       ],
       synchronize: true,

@@ -1,4 +1,5 @@
 import { BoardEntity } from 'src/board/entities/board.entity';
+import { CartChecklistEntity } from 'src/cart/entities/cart-checklist.entity';
 import { CartEntity } from 'src/cart/entities/cart.entity';
 import {
   Column,
@@ -63,6 +64,12 @@ export class UserEntity {
 
   @ManyToMany(() => CartEntity, (cart) => cart.members)
   cart_members: CartEntity;
+
+  @ManyToMany(
+    () => CartChecklistEntity,
+    (cartChecklist) => cartChecklist.checklist_users,
+  )
+  checklist_members: CartChecklistEntity;
 
   @CreateDateColumn()
   created_at: Date;

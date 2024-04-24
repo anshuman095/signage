@@ -9,10 +9,16 @@ import { LabelEntity } from './entities/label.entity';
 import { UserTimeTrackerEntity } from './entities/user-time-tracker.entity';
 import { AuthService } from 'src/auth/auth.service';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
+import { CartChecklistEntity } from './entities/cart-checklist.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CartEntity, LabelEntity, UserTimeTrackerEntity]),
+    TypeOrmModule.forFeature([
+      CartEntity,
+      LabelEntity,
+      UserTimeTrackerEntity,
+      CartChecklistEntity,
+    ]),
     UserModule,
     BoardModule,
   ],

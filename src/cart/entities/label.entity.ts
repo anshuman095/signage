@@ -15,7 +15,7 @@ export class LabelEntity {
   label_name: string;
 
   @Column({ type: 'varchar', nullable: true })
-  coloe_code: string;
+  color_code: string;
 
   @CreateDateColumn()
   created_at: Date;

@@ -42,8 +42,6 @@ export class InviteController {
           throw new Error('User does not exist');
         }
       } else {
-        console.log('email-->', email);
-
         await this.inviteService.sendInvitation(createInviteDto, email);
         const registrationLink = process.env.REGESTRATION_URL;
 
@@ -51,7 +49,6 @@ export class InviteController {
           subject: 'Registration Link',
           html: `Please click the following link to register your email: ${email} <a href="${registrationLink}">${registrationLink}</a> `,
         };
-        console.log('email--->', email);
 
         await this.emailService.sendEmail(email, emailData);
         return res.status(200).json({
