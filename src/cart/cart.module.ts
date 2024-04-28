@@ -1,28 +1,33 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CartEntity } from './entities/cart.entity';
+import { LabelEntity } from './entities/label.entity';
+import { CartChecklistEntity } from './entities/cart-checklist.entity';
+import { UserTimeTrackerEntity } from './entities/user-time-tracker.entity';
+import { CommentEntity } from './entities/comment.entity';
+import { CartController } from './cart.controller';
 import { UserModule } from 'src/user/user.module';
 import { BoardModule } from 'src/board/board.module';
-import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
-import { LabelEntity } from './entities/label.entity';
-import { UserTimeTrackerEntity } from './entities/user-time-tracker.entity';
 import { AuthService } from 'src/auth/auth.service';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
-import { CartChecklistEntity } from './entities/cart-checklist.entity';
+import { SocketService } from 'src/socket/socket.gateway';
+import { AttachmentEntity } from './entities/attachment.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       CartEntity,
       LabelEntity,
-      UserTimeTrackerEntity,
       CartChecklistEntity,
+      UserTimeTrackerEntity,
+      CommentEntity,
+      AttachmentEntity,
     ]),
     UserModule,
     BoardModule,
   ],
   controllers: [CartController],
-  providers: [CartService, AuthService, CloudinaryService],
+  providers: [CartService, AuthService, CloudinaryService, SocketService],
 })
 export class CartModule {}

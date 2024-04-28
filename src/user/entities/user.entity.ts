@@ -1,3 +1,4 @@
+import { BoardFlowEntity } from 'src/board/entities/board-flow.entity';
 import { BoardEntity } from 'src/board/entities/board.entity';
 import { CartChecklistEntity } from 'src/cart/entities/cart-checklist.entity';
 import { CartEntity } from 'src/cart/entities/cart.entity';
@@ -70,6 +71,9 @@ export class UserEntity {
     (cartChecklist) => cartChecklist.checklist_users,
   )
   checklist_members: CartChecklistEntity;
+
+  @ManyToMany(() => BoardFlowEntity, (boardFlow) => boardFlow.users)
+  flows: BoardFlowEntity[];
 
   @CreateDateColumn()
   created_at: Date;

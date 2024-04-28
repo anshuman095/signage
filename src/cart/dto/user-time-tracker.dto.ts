@@ -1,13 +1,7 @@
 export class UserTimeTrackerDto {
-  start_time: number;
+  start_date: number;
 
-  end_time: number;
-
-  Date: number;
-
-  time_worked_so_far: number;
-
-  user_id: number;
+  end_date: number;
 
   board_id: number;
 

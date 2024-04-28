@@ -87,6 +87,29 @@ export class UserService {
     }
   }
 
+  generateResetToken(email: string): string {
+    const payload = { email };
+    return jwt.sign(payload, process.env.RESET_SECRET_KEY, { expiresIn: '5m' });
+  }
+
+  verifyResetToken(token: string): { email: string } {
+    return jwt.verify(token, process.env.RESET_SECRET_KEY) as { email: string };
+  }
+
+  async resetPassword(email: string, newPassword: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (user) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+      user.password = hashedPassword;
+
+      await this.userRepository.save(user);
+    } else {
+      throw new Error('User not found');
+    }
+  }
+
   async searchUsersByEmail(email: string) {
     const users = await this.userRepository
       .createQueryBuilder('user')

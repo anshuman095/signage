@@ -11,15 +11,20 @@ import {
   ValidationPipe,
   Res,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 // import { UpdateUserDto } from "./dto/update-user.dto";
 import { CreateLoginDto } from './dto/create-login.dto';
+import { EmailService } from 'src/utility/email.service';
 
 @Controller('/user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Post('create')
   async create(
@@ -93,6 +98,75 @@ export class UserController {
       return res.status(500).json({
         success: false,
         message: err.message,
+      });
+    }
+  }
+
+  @Post('/forgot-password')
+  async forgotPassword(
+    @Body() createUserDto: CreateUserDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const user = await this.userService.UserRepository.findOne({
+        where: { email: createUserDto.email },
+      });
+
+      if (user) {
+        const resetToken = await this.userService.generateResetToken(
+          createUserDto.email,
+        );
+
+        const resetUrl = process.env.RESET_URL;
+        const emailData = {
+          subject: 'Password Reset',
+          html: `<p>Click the following link to reset your password:</p>
+          <a href="${resetUrl}/${resetToken}">Reset Password</a>`,
+        };
+        await this.emailService.sendEmail(createUserDto.email, emailData);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Password reset link sent to email',
+        });
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error,
+      });
+    }
+  }
+
+  @Post('/reset-password/:token')
+  async reset(
+    @Param('token') token: string,
+    @Body() createUserDto: { password: string; confirm_password: string },
+    @Res() res: Response,
+  ) {
+    try {
+      if (createUserDto.password !== createUserDto.confirm_password) {
+        throw new BadRequestException('Passwords do not match');
+      }
+
+      const { email } = this.userService.verifyResetToken(token);
+      this.userService.verifyResetToken(token);
+
+      await this.userService.resetPassword(email, createUserDto.password);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Password reset successful',
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error,
       });
     }
   }

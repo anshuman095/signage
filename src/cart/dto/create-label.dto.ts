@@ -8,4 +8,6 @@ export class CreateLabelDto {
   @IsNotEmpty()
   @IsString()
   color_code: string;
+
+  cart_id: number;
 }

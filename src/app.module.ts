@@ -3,20 +3,23 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './user/entities/user.entity';
 import { BoardEntity } from './board/entities/board.entity';
-import { UserModule } from './user/user.module';
-import { BoardModule } from './board/board.module';
-import { AuthModule } from './auth/auth.module';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { InviteModule } from './invite/invite.module';
 import { UserBoardEntity } from './board/entities/user-board.entity';
 import { InviteEntity } from './invite/entities/invite.entity';
-import { CartModule } from './cart/cart.module';
 import { BoardFlowEntity } from './board/entities/board-flow.entity';
-import { LabelEntity } from './cart/entities/label.entity';
-import { UserTimeTrackerEntity } from './cart/entities/user-time-tracker.entity';
 import { CartEntity } from './cart/entities/cart.entity';
+import { LabelEntity } from './cart/entities/label.entity';
 import { CartChecklistEntity } from './cart/entities/cart-checklist.entity';
+import { UserTimeTrackerEntity } from './cart/entities/user-time-tracker.entity';
+import { UserModule } from './user/user.module';
+import { BoardModule } from './board/board.module';
+import { InviteModule } from './invite/invite.module';
+import { CartModule } from './cart/cart.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { CommentEntity } from './cart/entities/comment.entity';
+import { AuthModule } from './auth/auth.module';
+import { AttachmentEntity } from './cart/entities/attachment.entity';
+// import { SocketGateway } from "./socket/socket.gateway";
 
 @Module({
   imports: [
@@ -38,6 +41,8 @@ import { CartChecklistEntity } from './cart/entities/cart-checklist.entity';
         LabelEntity,
         CartChecklistEntity,
         UserTimeTrackerEntity,
+        CommentEntity,
+        AttachmentEntity,
       ],
       synchronize: true,
     }),

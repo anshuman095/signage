@@ -23,10 +23,16 @@ export class UserTimeTrackerEntity {
   end_time: number;
 
   @Column({ type: 'varchar', nullable: true })
-  Date: number;
+  start_date: number;
 
   @Column({ type: 'varchar', nullable: true })
-  time_worked_so_far: number;
+  end_date: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  time_worked_so_far: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  total_time: string;
 
   @ManyToOne(() => UserEntity, (user) => user.id)
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
@@ -36,7 +42,7 @@ export class UserTimeTrackerEntity {
   @JoinColumn({ name: 'board_id', referencedColumnName: 'id' })
   board_id: BoardEntity;
 
-  @ManyToOne(() => CartEntity, (cart) => cart.id)
+  @ManyToOne(() => CartEntity, (cart) => cart.user_time_tracker)
   @JoinColumn({ name: 'cart_id', referencedColumnName: 'id' })
   cart_id: CartEntity;
 

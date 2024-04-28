@@ -26,6 +26,7 @@ import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { AuthenticationGuard } from 'src/auth/authentication.guard';
 import { AuthorizationGuard } from 'src/auth/authorization.guard';
 import { CreateBoardFlowDto } from './dto/create-board-flow.dto';
+import { AddMemberInBoardflowDto } from './dto/add-member-boardflow.dto';
 
 interface CustomRequest extends Request {
   user: { id: number; email: string };
@@ -46,7 +47,7 @@ export class BoardController {
     @Body(new ValidationPipe()) createBoardDto: CreateBoardDto,
     @Req() req: CustomRequest,
     @Res() res: Response,
-    @UploadedFile()
+    @UploadedFile() // new ParseFilePipe({
     file: Express.Multer.File,
   ) {
     try {
@@ -54,8 +55,10 @@ export class BoardController {
       if (!createBoardDto.boardName) {
         throw new Error('Board Name is required');
       }
+      // if (createBoardDto.logo) {
       const result = await this.cloudinaryService.uploadSingleFile(file.buffer);
       createBoardDto.logo = result.secure_url;
+      // }
       const board = await this.boardService.createBoard(createBoardDto, id);
       return res.status(201).json({
         success: true,
@@ -137,13 +140,14 @@ export class BoardController {
     }
   }
 
-  @Get('/flowBoard/fxcg/:boardId')
-  async getFlowOfABoard(
+  @Get('/:boardId/boardFlow')
+  async getFlowOfABoardByBoardId(
     @Param('boardId') boardId: number,
     @Res() res: Response,
   ) {
     try {
-      const boardFlow = await this.boardService.getFlowOfABoard(boardId);
+      const boardFlow =
+        await this.boardService.getFlowOfABoardByBoardId(boardId);
       return res.status(200).json({
         success: true,
         message: boardFlow,
@@ -253,7 +257,7 @@ export class BoardController {
     }
   }
 
-  @Post('/createBoardFlow')
+  @Post('/create/boardFlow')
   async createBoardFlow(
     @Body() createBoardFlowDto: CreateBoardFlowDto,
     @Res() res: Response,
@@ -277,4 +281,22 @@ export class BoardController {
   }
 
   // @Get("/getUsersInBoard/:boardId")
+  @Post('/addMembersInBoardFlow')
+  async addMembersInBoardFlow(
+    @Body() addMemberInBoardflowDto: AddMemberInBoardflowDto,
+    @Res() res: Response,
+  ) {
+    try {
+      await this.boardService.addMembersInBoardFlow(addMemberInBoardflowDto);
+      return res.status(201).json({
+        success: true,
+        message: 'User added successfully!',
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 }
