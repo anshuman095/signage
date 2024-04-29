@@ -13,6 +13,8 @@ import {
   Query,
   UseInterceptors,
   UploadedFiles,
+  Put,
+  Patch,
   // UseInterceptors,
   // UploadedFile,
 } from '@nestjs/common';
@@ -24,13 +26,15 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { UserTimeTrackerDto } from './dto/user-time-tracker.dto';
 import { CreateLabelDto } from './dto/create-label.dto';
-import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto ';
+import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import {
   // FileFieldsInterceptor,
   FilesInterceptor,
 } from '@nestjs/platform-express';
+import { CreateTaskCompleteDto } from './dto/create-task-complete.dto';
+import { MoveCartDto } from './dto/move-cart.dto';
 // import { UpdateCartDto } from './dto/update-cart.dto';
 
 interface CustomRequest extends Request {
@@ -345,6 +349,44 @@ export class CartController {
       return res.status(201).json({
         success: true,
         message: attachments,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @UseGuards(AuthenticationGuard)
+  @Put('/taskComplete')
+  async taskComplete(
+    @Req() req: CustomRequest,
+    @Body() createTaskCompleteDto: CreateTaskCompleteDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const { id } = req.user;
+      await this.cartService.taskComplete(createTaskCompleteDto, id);
+      return res.status(201).json({
+        success: true,
+        message: 'Task Completed!',
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Patch('/moveCartToNext')
+  async moveCartToNext(@Body() moveCartDto: MoveCartDto, @Res() res: Response) {
+    try {
+      await this.cartService.moveCart(moveCartDto);
+      return res.status(201).json({
+        success: true,
+        message: 'Cart successfully moved to the next cart',
       });
     } catch (error) {
       return res.status(400).json({

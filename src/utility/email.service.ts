@@ -4,7 +4,9 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class EmailService {
   constructor() {}
-  async sendEmail(email: string, data): Promise<void> {
+  async sendEmail(emails: string | string[], data): Promise<void> {
+    console.log('11');
+
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -15,7 +17,7 @@ export class EmailService {
 
     const mailOptions = {
       from: process.env.MAIL_ID,
-      to: email,
+      to: emails,
       subject: data?.subject,
       html: data?.html,
     };

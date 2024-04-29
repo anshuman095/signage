@@ -23,9 +23,6 @@ export class InviteService {
     @InjectRepository(BoardEntity)
     private boardRepository: Repository<BoardEntity>,
 
-    @InjectRepository(BoardEntity)
-    private boardUserBoardRepository: Repository<BoardEntity>,
-
     private readonly emailService: EmailService,
   ) {}
 

@@ -4,14 +4,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { CartEntity } from './entities/cart.entity';
 import { BoardEntity } from 'src/board/entities/board.entity';
-import { UserEntity } from 'src/user/entities/user.entity';
+import { TaskStatus, UserEntity } from 'src/user/entities/user.entity';
 import { UserTimeTrackerEntity } from './entities/user-time-tracker.entity';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UserTimeTrackerDto } from './dto/user-time-tracker.dto';
 import { LabelEntity } from './entities/label.entity';
 import { CreateLabelDto } from './dto/create-label.dto';
-import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto ';
+import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto';
 import { CartChecklistEntity } from './entities/cart-checklist.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentEntity } from './entities/comment.entity';
@@ -19,6 +19,10 @@ import { SocketService } from '../socket/socket.gateway';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { AttachmentEntity } from './entities/attachment.entity';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
+import { CreateTaskCompleteDto } from './dto/create-task-complete.dto';
+import { BoardFlowEntity } from 'src/board/entities/board-flow.entity';
+import { MoveCartDto } from './dto/move-cart.dto';
+import { EmailService } from 'src/utility/email.service';
 
 @Injectable()
 export class CartService {
@@ -41,6 +45,9 @@ export class CartService {
     @InjectRepository(BoardEntity)
     private boardRepository: Repository<BoardEntity>,
 
+    @InjectRepository(BoardFlowEntity)
+    private boardFlowRepository: Repository<BoardFlowEntity>,
+
     @InjectRepository(CommentEntity)
     private commentRepository: Repository<CommentEntity>,
 
@@ -50,6 +57,8 @@ export class CartService {
     private readonly socketService: SocketService,
 
     private readonly cloudinaryService: CloudinaryService,
+
+    private readonly emailService: EmailService,
   ) {}
   async createCart(createCartDto: CreateCartDto, userId: number) {
     try {
@@ -61,9 +70,7 @@ export class CartService {
         where: { id: board_id },
         relations: ['flows'],
       });
-      console.log('board.flows-->', board.flows);
       const flow = board.flows[0];
-      console.log('flow-->', flow);
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
@@ -71,10 +78,9 @@ export class CartService {
         ...createCartDto,
         board_id: board,
         created_by: user,
-        boardFlow: flow,
+        flow_id: flow,
       });
       const cart = await this.cartRepository.save(newCart);
-      delete cart.created_by.password;
       return cart;
     } catch (error) {
       throw new Error(error.message);
@@ -209,14 +215,6 @@ export class CartService {
           'user_time_tracker',
         ],
       });
-      delete cart.created_by.password;
-      if (cart.updated_by) {
-        delete cart.updated_by.password;
-      }
-
-      cart.members.map((members) => {
-        delete members.password;
-      });
       return cart;
     } catch (error) {
       throw new Error(error.message);
@@ -315,7 +313,6 @@ export class CartService {
           'user_time_tracker',
         ],
       });
-      console.log(cart);
       if (!cart) {
         throw new Error('Cart does not');
       }
@@ -555,6 +552,102 @@ export class CartService {
       );
 
       // return attachments;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async taskComplete(
+    createTaskCompleteDto: CreateTaskCompleteDto,
+    user_id: number,
+  ) {
+    try {
+      const { board_id, flow_id, cart_id } = createTaskCompleteDto;
+      const board = await this.boardRepository.findOne({
+        where: { id: board_id },
+        relations: ['flows'],
+      });
+      let flowExist = false;
+      board.flows.forEach((flow) => {
+        if (flow.id === flow_id) {
+          flowExist = true;
+        }
+      });
+      if (!flowExist) {
+        throw new Error('Flow does not exist in board');
+      }
+      let userExist = false;
+      const flow = await this.boardFlowRepository.findOne({
+        where: { id: flow_id },
+        relations: ['users'],
+      });
+      flow.users.forEach((user) => {
+        if (user.id === user_id) {
+          userExist = true;
+        }
+      });
+      if (!userExist) {
+        throw new Error('User does not exist in flow');
+      }
+      const cart = await this.cartRepository.findOne({
+        where: { id: cart_id },
+        relations: ['board_id'],
+      });
+
+      if (board_id !== cart?.board_id.id) {
+        throw new Error('Cart does not belong to board');
+      }
+      const user = await this.userRepository.findOne({
+        where: { id: user_id },
+      });
+      user.task_status = TaskStatus.COMPLETED;
+      return await this.userRepository.save(user);
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async moveCart(moveCartDto: MoveCartDto) {
+    try {
+      const cart = await this.cartRepository.findOne({
+        where: { id: moveCartDto.cart_id },
+        relations: ['flow_id', 'flow_id.users', 'board_id.flows'],
+      });
+
+      const allCompleted = cart.flow_id.users.every(
+        (user) => user.task_status === 'COMPLETED',
+      );
+
+      if (!allCompleted) {
+        throw new Error(
+          'You cannot move the cart to the next stage because not all users have completed their tasks.',
+        );
+      }
+
+      const nextBoardFlow = await this.boardFlowRepository.findOne({
+        where: {
+          board_id: { id: cart.board_id.id },
+          index: +cart.flow_id.index + 1,
+        },
+        relations: ['users'],
+      });
+      console.log('nextBoardFlow-->', nextBoardFlow);
+
+      cart.flow_id = nextBoardFlow;
+      await this.cartRepository.save(cart);
+
+      const userEmails = nextBoardFlow.users.map((user) => user.email);
+
+      // Send email to all users in nextBoardFlow
+      const taskUpdateLink = `${process.env.TASKUPDATE_URL}`;
+      console.log('taskUpdateLink', taskUpdateLink);
+
+      const emailData = {
+        subject: 'Task Update',
+        html: `Now you can start the task <a href="${taskUpdateLink}">${taskUpdateLink}</a>`,
+      };
+      await this.emailService.sendEmail(userEmails, emailData);
+      return cart;
     } catch (error) {
       throw new Error(error.message);
     }

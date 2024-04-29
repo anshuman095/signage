@@ -75,7 +75,7 @@ export class CartEntity {
 
   @ManyToOne(() => BoardFlowEntity, (boardFlow) => boardFlow.id)
   @JoinColumn({ name: 'flow_id', referencedColumnName: 'id' })
-  boardFlow: BoardFlowEntity;
+  flow_id: BoardFlowEntity;
 
   @CreateDateColumn()
   created_at: Date;

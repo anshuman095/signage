@@ -23,21 +23,26 @@ export enum StatusUser {
   ACTIVE = 'ACTIVE',
 }
 
+export enum TaskStatus {
+  TODO = 'TODO',
+  COMPLETED = 'COMPLETED',
+}
+
 @Entity('users')
 export class UserEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 30, nullable: true })
+  @Column({ type: 'varchar', length: 30 })
   fName: string;
 
-  @Column({ type: 'varchar', length: 30, nullable: true })
+  @Column({ type: 'varchar', length: 30 })
   lName: string;
 
-  @Column({ type: 'varchar', unique: true, length: 20, nullable: true })
+  @Column({ type: 'varchar', unique: true, length: 20 })
   email: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', select: false })
   password: string;
 
   @Column({ type: 'varchar', nullable: true })
@@ -59,6 +64,14 @@ export class UserEntity {
 
   @Column({ type: 'enum', nullable: true, enum: Role, default: Role.USER })
   role: Role;
+
+  @Column({
+    type: 'enum',
+    nullable: true,
+    enum: TaskStatus,
+    default: TaskStatus.TODO,
+  })
+  task_status: TaskStatus;
 
   @ManyToMany(() => BoardEntity, (board) => board.users)
   boards: BoardEntity;

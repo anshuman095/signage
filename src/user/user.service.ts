@@ -49,15 +49,16 @@ export class UserService {
         </a>`,
       };
       await this.emailService.sendEmail(createUserDto.email, emailData);
-      delete userData.password;
       return userData;
     }
   }
 
   async login(createLogionDto: CreateLoginDto) {
-    const user = await this.userRepository.findOne({
-      where: { email: createLogionDto.email },
-    });
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email: createLogionDto.email })
+      .getOne();
     // if(user.isEmailVerified === false) {
     //   throw new Error("Email is not verified")
     // }

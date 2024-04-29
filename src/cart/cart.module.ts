@@ -13,6 +13,7 @@ import { AuthService } from 'src/auth/auth.service';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { SocketService } from 'src/socket/socket.gateway';
 import { AttachmentEntity } from './entities/attachment.entity';
+import { EmailService } from 'src/utility/email.service';
 
 @Module({
   imports: [
@@ -28,6 +29,12 @@ import { AttachmentEntity } from './entities/attachment.entity';
     BoardModule,
   ],
   controllers: [CartController],
-  providers: [CartService, AuthService, CloudinaryService, SocketService],
+  providers: [
+    CartService,
+    AuthService,
+    CloudinaryService,
+    SocketService,
+    EmailService,
+  ],
 })
 export class CartModule {}
