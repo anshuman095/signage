@@ -23,7 +23,7 @@ export class BoardEntity {
   @Column({ type: 'varchar', nullable: true })
   logo: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   description: string;
 
   @ManyToOne(() => UserEntity, (user) => user.id)

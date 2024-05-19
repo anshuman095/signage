@@ -23,9 +23,13 @@ export class CartChecklistEntity {
   @Column({ type: 'varchar', nullable: true, default: false })
   checklist_status: boolean;
 
-  @ManyToOne(() => CartEntity, (user) => user.id)
+  @ManyToOne(() => CartEntity, (cart) => cart.id)
   @JoinColumn({ name: 'cart_id', referencedColumnName: 'id' })
   cart_id: CartEntity;
+
+  @ManyToOne(() => UserEntity, (user) => user.id)
+  @JoinColumn({ name: 'created_by', referencedColumnName: 'id' })
+  created_by: UserEntity;
 
   @ManyToMany(() => UserEntity, (user) => user.checklist_members, {
     cascade: true,

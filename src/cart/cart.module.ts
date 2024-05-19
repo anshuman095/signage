@@ -14,6 +14,7 @@ import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { SocketService } from 'src/socket/socket.gateway';
 import { AttachmentEntity } from './entities/attachment.entity';
 import { EmailService } from 'src/utility/email.service';
+import { CartHistoryEntity } from './entities/cart-history.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EmailService } from 'src/utility/email.service';
       UserTimeTrackerEntity,
       CommentEntity,
       AttachmentEntity,
+      CartHistoryEntity,
     ]),
     UserModule,
     BoardModule,

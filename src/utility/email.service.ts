@@ -5,8 +5,6 @@ import * as nodemailer from 'nodemailer';
 export class EmailService {
   constructor() {}
   async sendEmail(emails: string | string[], data): Promise<void> {
-    console.log('11');
-
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {

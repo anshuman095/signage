@@ -9,7 +9,7 @@ export class CreateBoardDto {
 
   description: string;
 
-  userId: number;
+  userId: number | string;
 
   user_email: string;
 }

@@ -23,6 +23,8 @@ import { CreateTaskCompleteDto } from './dto/create-task-complete.dto';
 import { BoardFlowEntity } from 'src/board/entities/board-flow.entity';
 import { MoveCartDto } from './dto/move-cart.dto';
 import { EmailService } from 'src/utility/email.service';
+import { CartHistoryEntity } from './entities/cart-history.entity';
+import { AddMemberCartChecklistDto } from './dto/add-member-cart-checklist.dto';
 
 @Injectable()
 export class CartService {
@@ -54,13 +56,16 @@ export class CartService {
     @InjectRepository(AttachmentEntity)
     private attachmentRepository: Repository<AttachmentEntity>,
 
+    @InjectRepository(CartHistoryEntity)
+    private cartHistoryRepository: Repository<CartHistoryEntity>,
+
     private readonly socketService: SocketService,
 
     private readonly cloudinaryService: CloudinaryService,
 
     private readonly emailService: EmailService,
   ) {}
-  async createCart(createCartDto: CreateCartDto, userId: number) {
+  async createCart(createCartDto: CreateCartDto, userId: number, files) {
     try {
       const { board_id } = createCartDto;
       if (!board_id) {
@@ -71,9 +76,15 @@ export class CartService {
         relations: ['flows'],
       });
       const flow = board.flows[0];
+      if (!flow) {
+        throw new Error('Create firstly flow for board ' + board.boardName);
+      }
       const user = await this.userRepository.findOne({
         where: { id: userId },
       });
+      if (!user) {
+        throw new Error('User not found!');
+      }
       const newCart = this.cartRepository.create({
         ...createCartDto,
         board_id: board,
@@ -81,18 +92,78 @@ export class CartService {
         flow_id: flow,
       });
       const cart = await this.cartRepository.save(newCart);
+
+      const cartDetails = await this.cartRepository.findOne({
+        where: { id: cart.id },
+        relations: ['members', 'labels', 'attachments', 'cart_history'],
+      });
+
+      if (createCartDto.label_name) {
+        const label = await this.createLabel(
+          {
+            cart_id: cartDetails.id,
+            label_name: createCartDto.label_name,
+            color_code: createCartDto.color_code,
+          },
+          user.id,
+        );
+        cartDetails.labels = [...cartDetails?.labels, label];
+        await this.cartRepository.save(cartDetails);
+      }
+      if (createCartDto.checklist_title) {
+        const createCartChecklistDto = {
+          cart_id: cartDetails.id,
+          checklist_title: createCartDto.checklist_title,
+          checklist_status: Boolean(createCartDto?.checklist_status),
+        };
+        await this.addChecklistIntoCart(createCartChecklistDto, user.id);
+        // cartDetails.attachments = [...cartDetails?.attachments, checklist];
+        // await this.cartRepository.save(cart);
+      }
+      if (files.length > 0) {
+        const createAttachmentDto = {
+          cart_id: cartDetails.id,
+          attachment_url: createCartDto.attachment_url,
+        };
+        const attachment = await this.createAttachment(
+          createAttachmentDto,
+          userId,
+          files,
+        );
+        console.log('attachment last', attachment);
+        cartDetails.attachments = [...cartDetails?.attachments, attachment];
+        await this.cartRepository.save(cart);
+      }
+      if (createCartDto.user_id) {
+        console.log('5');
+        const addMemberDto = {
+          cart_id: cartDetails.id,
+          user_id: Number(createCartDto.user_id),
+        };
+        const members = await this.addMembersInCart(addMemberDto, user.id);
+        cartDetails.members = [...cartDetails.members, members.members[0]];
+        await this.cartRepository.save(cartDetails);
+      }
+      const new_history = this.cartHistoryRepository.create({
+        history_message: `${user.fName} ${user.lName} created a task ${cart.cart_title}`,
+        cart_id: cartDetails,
+        created_by: user,
+      });
+      const history = await this.cartHistoryRepository.save(new_history);
+      cartDetails.cart_history = [...cartDetails?.cart_history, history];
+      await this.cartRepository.save(cartDetails);
       return cart;
     } catch (error) {
       throw new Error(error.message);
     }
   }
 
-  async createLabel(createLabelDto: CreateLabelDto) {
+  async createLabel(createLabelDto: CreateLabelDto, userId: number) {
     try {
       const { cart_id } = createLabelDto;
       const cart = await this.cartRepository.findOne({
         where: { id: cart_id },
-        relations: ['labels'],
+        relations: ['labels', 'cart_history'],
       });
       const newLabel = this.labelRepository.create({
         ...createLabelDto,
@@ -102,6 +173,19 @@ export class CartService {
 
       cart.labels = [...cart.labels, label];
       await this.cartRepository.save(cart);
+
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+      const new_history = this.cartHistoryRepository.create({
+        history_message: `${user.fName} ${user.lName} created a label ${label.label_name}`,
+        cart_id: cart,
+        created_by: user,
+      });
+      const history = await this.cartHistoryRepository.save(new_history);
+      cart.cart_history = [...cart?.cart_history, history];
+      await this.cartRepository.save(cart);
+
       return label;
     } catch (error) {
       throw new Error(error.message);
@@ -117,45 +201,40 @@ export class CartService {
     }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} cart`;
-  }
-
-  async getMembersInBoard(boardId: number, email: string) {
+  async getMembersInBoard(boardId: number) {
     try {
       const { users } = await this.boardRepository
         .createQueryBuilder('board')
         .leftJoinAndSelect('board.users', 'users')
         .where('board.id = :id', { id: boardId })
-        .andWhere('users.email LIKE :email', { email: `%${email}%` })
         .getOne();
 
       return users;
-      // let query = this.boardRepository
-      //   .createQueryBuilder("board")
-      //   .leftJoinAndSelect("board.users", "users")
-      //   .where("board.id = :id", { id: boardId });
-
-      // if (email) {
-      //   query = query.andWhere("users.email LIKE :email", {
-      //     email: `%${email}%`,
-      //   });
-      // }
-      // const { users } = await query.getOne();
-      // return users;
     } catch (error) {
       throw new Error(error.message);
     }
   }
 
-  async addMembersInCart(addMemberDto: AddMemberDto) {
+  async addMembersInCart(addMemberDto: AddMemberDto, loggedInUserId: number) {
     try {
       const { cart_id, user_id } = addMemberDto;
+      console.log('user_id', user_id);
 
       const cart = await this.cartRepository.findOne({
         where: { id: cart_id },
-        relations: ['board_id', 'members'],
+        relations: ['board_id', 'members', 'cart_history'],
       });
+
+      let userExistsInCart = false;
+      for (let i = 0; i < cart.members.length; i++) {
+        if (cart.members[i].id === user_id) {
+          userExistsInCart = true;
+          break;
+        }
+      }
+      if (userExistsInCart) {
+        throw new Error('User is already a member of the cart');
+      }
 
       const board = await this.boardRepository.findOne({
         where: { id: cart.board_id.id },
@@ -179,6 +258,19 @@ export class CartService {
 
       cart.members = [...cart.members, user];
       await this.cartRepository.save(cart);
+
+      const loggedInUserData = await this.userRepository.findOne({
+        where: { id: loggedInUserId },
+      });
+
+      const new_history = this.cartHistoryRepository.create({
+        history_message: `A new user ${user.fName} ${user.lName} is added in the cart by ${loggedInUserData.fName} ${loggedInUserData.lName}`,
+        cart_id: cart,
+        created_by: user,
+      });
+      const history = await this.cartHistoryRepository.save(new_history);
+      cart.cart_history = [...cart?.cart_history, history];
+      await this.cartRepository.save(cart);
       return cart;
     } catch (error) {
       throw new Error(error.message);
@@ -200,8 +292,14 @@ export class CartService {
     }
   }
 
-  async getCartById(cartId: number) {
+  async getCartById(cartId: number, userId: number) {
     try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+      if (!user) {
+        throw new Error('User not found');
+      }
       const cart = await this.cartRepository.findOne({
         where: { id: cartId },
         relations: [
@@ -213,6 +311,10 @@ export class CartService {
           'checklists.checklist_users',
           'labels',
           'user_time_tracker',
+          'attachments',
+          'attachments.attach_by',
+          'cart_history',
+          'flow_id',
         ],
       });
       return cart;
@@ -221,67 +323,99 @@ export class CartService {
     }
   }
 
-  async addChecklistIntoCart(createCartChecklistDto: CreateCartChecklistDto) {
+  async addChecklistIntoCart(
+    createCartChecklistDto: CreateCartChecklistDto,
+    userId: number,
+  ) {
     try {
-      const { user_id, cart_id } = createCartChecklistDto;
+      console.log('3');
+      const { cart_id } = createCartChecklistDto;
 
       const cart = await this.cartRepository.findOne({
         where: { id: cart_id },
-        relations: ['members', 'checklists'],
+        relations: ['members', 'checklists', 'cart_history'],
       });
 
-      let userExist = false;
-      for (let i = 0; i < cart.members.length; i++) {
-        if (cart.members[i].id === user_id) {
-          userExist = true;
-          break;
-        }
-      }
-      if (!userExist) {
-        throw new Error('User does not exist in cart');
-      }
-
-      const user = await this.userRepository.findOne({
-        where: { id: user_id },
+      const creatingUser = await this.userRepository.findOne({
+        where: { id: userId },
       });
-
-      const checklistExist = await this.cartChecklistRepository.findOne({
-        where: { checklist_title: createCartChecklistDto.checklist_title },
-        relations: ['checklist_users'],
-      });
-
-      if (checklistExist) {
-        checklistExist.checklist_users = [
-          ...checklistExist.checklist_users,
-          user,
-        ];
-        const checklistExistData =
-          await this.cartChecklistRepository.save(checklistExist);
-        return checklistExistData;
-      }
 
       const newChecklist = this.cartChecklistRepository.create({
         ...createCartChecklistDto,
         cart_id: cart,
+        created_by: creatingUser,
       });
       const checklist = await this.cartChecklistRepository.save(newChecklist);
 
-      const checklistDetails = await this.cartChecklistRepository.findOne({
-        where: { id: checklist.id },
-        relations: ['checklist_users'],
-      });
-      checklistDetails.checklist_users = [
-        ...checklistDetails.checklist_users,
-        user,
-      ];
-      await this.cartChecklistRepository.save(checklistDetails);
+      // const checklistDetails = await this.cartChecklistRepository.findOne({
+      //   where: { id: checklist.id },
+      //   relations: ["checklist_users"],
+      // });
+      // checklistDetails.checklist_users = [
+      //   ...checklistDetails.checklist_users,
+      //   user,
+      // ];
+      // await this.cartChecklistRepository.save(checklistDetails);
 
       cart.checklists = [...cart.checklists, checklist];
+
+      const new_history = this.cartHistoryRepository.create({
+        history_message: `A new issue is added in the checklist by ${creatingUser.fName} ${creatingUser.lName}`,
+        cart_id: cart,
+        created_by: creatingUser,
+      });
+      const history = await this.cartHistoryRepository.save(new_history);
+      cart.cart_history = [...cart?.cart_history, history];
+      await this.cartRepository.save(cart);
       await this.cartRepository.save(cart);
       return checklist;
     } catch (error) {
       throw new Error(error.message);
     }
+  }
+
+  async addMembersInChecklistOfCart(
+    logginUserId: number,
+    addMemberCartChecklistDto: AddMemberCartChecklistDto,
+  ) {
+    const cart = await this.cartRepository.findOne({
+      where: { id: addMemberCartChecklistDto.cart_id },
+      relations: ['cart_history'],
+    });
+    let userExist = false;
+    for (let i = 0; i < cart.members.length; i++) {
+      if (cart.members[i].id === addMemberCartChecklistDto.user_id) {
+        userExist = true;
+        break;
+      }
+    }
+    if (!userExist) {
+      throw new Error('User does not exist in cart');
+    }
+    const user = await this.userRepository.findOne({
+      where: { id: addMemberCartChecklistDto.user_id },
+    });
+    const checklistDetails = await this.cartChecklistRepository.findOne({
+      where: { id: addMemberCartChecklistDto.checklist_id },
+      relations: ['checklist_users'],
+    });
+    checklistDetails.checklist_users = [
+      ...checklistDetails.checklist_users,
+      user,
+    ];
+    await this.cartChecklistRepository.save(checklistDetails);
+
+    const loggedInUserData = await this.userRepository.findOne({
+      where: { id: logginUserId },
+    });
+    const new_history = this.cartHistoryRepository.create({
+      history_message: `A new user ${user.fName} ${user.lName} is added in the checklist by ${loggedInUserData.fName} ${loggedInUserData.lName}`,
+      cart_id: cart,
+      created_by: loggedInUserData,
+    });
+    const history = await this.cartHistoryRepository.save(new_history);
+    cart.cart_history = [...cart?.cart_history, history];
+    await this.cartRepository.save(cart);
   }
 
   async getChecklistById(checklistId: number) {
@@ -311,6 +445,10 @@ export class CartService {
           'checklists.checklist_users',
           'labels',
           'user_time_tracker',
+          'attachments',
+          'attachments.attach_by',
+          'cart_history',
+          'flow_id',
         ],
       });
       if (!cart) {
@@ -470,8 +608,15 @@ export class CartService {
       const { cart_id } = createCommentDto;
       const cartDetails = await this.cartRepository.findOne({
         where: { id: cart_id },
-        relations: ['members', 'board_id', 'user_time_tracker', 'comments'],
+        relations: [
+          'members',
+          'board_id',
+          'user_time_tracker',
+          'comments',
+          'cart_history',
+        ],
       });
+      console.log('cartDetails.members', cartDetails.members);
       let userExist = false;
       cartDetails.members.forEach((element) => {
         if (element.id === user_id) {
@@ -502,6 +647,16 @@ export class CartService {
       if (receiverSocketId) {
         this.socketService.emitNewComment(receiverSocketId, comment);
       }
+
+      const new_history = this.cartHistoryRepository.create({
+        history_message: `${user.fName} ${user.lName} commented ${createComment.comment_message}`,
+        cart_id: cartDetails,
+        created_by: user,
+      });
+      const history = await this.cartHistoryRepository.save(new_history);
+      cartDetails.cart_history = [...cartDetails?.cart_history, history];
+      await this.cartRepository.save(cartDetails);
+
       return comment;
     } catch (error) {
       throw new Error(error.message);
@@ -512,46 +667,80 @@ export class CartService {
     createAttachmentDto: CreateAttachmentDto,
     user_id: number,
     files,
-  ) {
-    // : Promise<AttachmentEntity[]>
+  ): Promise<AttachmentEntity> {
     try {
       const { cart_id } = createAttachmentDto;
 
       const cartDetails = await this.cartRepository.findOne({
         where: { id: cart_id },
-        relations: ['members', 'board_id', 'user_time_tracker', 'comments'],
-      });
-      let userExist = false;
-      cartDetails.members.forEach((element) => {
-        if (element.id === user_id) {
-          userExist = true;
-        }
+        relations: [
+          'members',
+          'board_id',
+          'user_time_tracker',
+          'comments',
+          'attachments',
+          'cart_history',
+        ],
       });
 
-      if (!userExist) {
-        throw new Error('User does not exist in cart');
-      }
+      // let userExist = false;
+      // cartDetails?.members.forEach((element) => {
+      //   if (element.id === user_id) {
+      //     userExist = true;
+      //   }
+      // });
+
+      // if (!userExist) {
+      //   throw new Error("User does not exist in cart");
+      // }
 
       const user = await this.userRepository.findOne({
         where: { id: user_id },
       });
-      console.log(user);
-      console.log(files);
 
       const attachmentUrl = await this.cloudinaryService.uploadFiles(files);
+
+      console.log('44');
+      createAttachmentDto.attachment_url = [];
       for (let i = 0; i < attachmentUrl.length; i++) {
         createAttachmentDto.attachment_url.push(attachmentUrl[i].secure_url);
       }
 
-      // for(let i = 0; i < attachmentUrl.length; i++) {
-      //   createAttachmentDto.attachment_url.push(attachmentUrl)
-      // }
-      console.log(
-        'createAttachmentDto.attachment_url->',
-        createAttachmentDto.attachment_url,
-      );
+      console.log('45');
+      console.log('cartDetails');
+      const new_attachment = this.attachmentRepository.create({
+        cart_id: cartDetails,
+        attach_by: user,
+        attachment_url: createAttachmentDto.attachment_url,
+      });
+      const attachment = await this.attachmentRepository.save(new_attachment);
+      console.log('attachment in function', attachment);
 
-      // return attachments;
+      cartDetails.attachments = [...cartDetails.attachments, attachment];
+      // await this.cartRepository.save(cartDetails);
+
+      const new_history = this.cartHistoryRepository.create({
+        history_message: `${user.fName} ${user.lName} attched ${attachmentUrl.length}`,
+        cart_id: cartDetails,
+        created_by: user,
+      });
+      const history = await this.cartHistoryRepository.save(new_history);
+      cartDetails.cart_history = [...cartDetails?.cart_history, history];
+      await this.cartRepository.save(cartDetails);
+
+      return attachment;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getAllCommentsOfACart(cartId: number) {
+    try {
+      const cart = await this.cartRepository.findOne({
+        where: { id: cartId },
+        relations: ['comments'],
+      });
+      return cart.comments;
     } catch (error) {
       throw new Error(error.message);
     }
@@ -623,7 +812,6 @@ export class CartService {
           'You cannot move the cart to the next stage because not all users have completed their tasks.',
         );
       }
-
       const nextBoardFlow = await this.boardFlowRepository.findOne({
         where: {
           board_id: { id: cart.board_id.id },
@@ -636,9 +824,13 @@ export class CartService {
       cart.flow_id = nextBoardFlow;
       await this.cartRepository.save(cart);
 
+      for (const user of nextBoardFlow.users) {
+        user.task_status = TaskStatus.COMPLETED;
+        await this.userRepository.save(user);
+      }
+
       const userEmails = nextBoardFlow.users.map((user) => user.email);
 
-      // Send email to all users in nextBoardFlow
       const taskUpdateLink = `${process.env.TASKUPDATE_URL}`;
       console.log('taskUpdateLink', taskUpdateLink);
 
@@ -648,6 +840,56 @@ export class CartService {
       };
       await this.emailService.sendEmail(userEmails, emailData);
       return cart;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getAllCartsOfABoard(boardId: number) {
+    try {
+      const carts = await this.cartRepository.find({
+        where: { board_id: { id: boardId } },
+        relations: [
+          'created_by',
+          'updated_by',
+          'board_id',
+          'members',
+          'checklists',
+          'checklists.checklist_users',
+          'labels',
+          'user_time_tracker',
+          'attachments',
+          'attachments.attach_by',
+          'flow_id',
+        ],
+        order: { created_at: 'DESC' },
+      });
+      return carts;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getAllAttachmentsOfCart(cartId: number) {
+    try {
+      const carts = await this.cartRepository.find({
+        where: { id: cartId },
+        relations: ['attachments'],
+        select: ['attachments'],
+      });
+      return carts;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  async getHistoryOfCart(cartId: number) {
+    try {
+      const history = await this.cartHistoryRepository.find({
+        where: { cart_id: { id: cartId } },
+        relations: ['created_by', 'cart_id'],
+      });
+      return history;
     } catch (error) {
       throw new Error(error.message);
     }

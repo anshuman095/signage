@@ -4,38 +4,28 @@ import {
   Get,
   Post,
   Body,
-  // Patch,
   Param,
-  Delete,
   Req,
   Res,
   UseGuards,
-  Query,
   UseInterceptors,
   UploadedFiles,
   Put,
   Patch,
-  // UseInterceptors,
-  // UploadedFile,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { AuthenticationGuard } from 'src/auth/authentication.guard';
 import { AddMemberDto } from './dto/add-member.dto';
-// import { FileInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from 'src/utility/cloudinary/cloudinary.service';
 import { UserTimeTrackerDto } from './dto/user-time-tracker.dto';
 import { CreateLabelDto } from './dto/create-label.dto';
 import { CreateCartChecklistDto } from './dto/create-cart-checklist.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
-import {
-  // FileFieldsInterceptor,
-  FilesInterceptor,
-} from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreateTaskCompleteDto } from './dto/create-task-complete.dto';
 import { MoveCartDto } from './dto/move-cart.dto';
-// import { UpdateCartDto } from './dto/update-cart.dto';
 
 interface CustomRequest extends Request {
   user: { id: number; email: string };
@@ -50,21 +40,16 @@ export class CartController {
 
   @UseGuards(AuthenticationGuard)
   @Post('/create')
-  // @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FilesInterceptor('attachment_url'))
   async create(
     @Body() createCartDto: CreateCartDto,
     @Req() req: CustomRequest,
     @Res() res: Response,
-    // @UploadedFile()
-    // file: Express.Multer.File,
+    @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
     try {
       const { id } = req.user;
-      // console.log('file here-->', file);
-      // console.log('file.buffer-->', file.buffer);
-      // const result = await this.cloudinaryService.uploadSingleFile(file.buffer);
-      // console.log('result.secure_url', result.secure_url);
-      const cart = await this.cartService.createCart(createCartDto, id);
+      const cart = await this.cartService.createCart(createCartDto, id, files);
       return res.status(201).json({
         success: true,
         message: cart,
@@ -77,13 +62,16 @@ export class CartController {
     }
   }
 
+  @UseGuards(AuthenticationGuard)
   @Post('/create/label')
   async createLabel(
+    @Req() req: CustomRequest,
     @Body() createLabelDto: CreateLabelDto,
     @Res() res: Response,
   ) {
     try {
-      const label = await this.cartService.createLabel(createLabelDto);
+      const { id } = req.user;
+      const label = await this.cartService.createLabel(createLabelDto, id);
       return res.status(201).json({
         success: true,
         message: label,
@@ -117,19 +105,14 @@ export class CartController {
   //   return this.cartService.update(+id, updateCartDto);
   // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.cartService.remove(+id);
-  }
-
   @Get('/getMembersInBoard/:boardId')
   async getMembersInABoard(
     @Param('boardId') boardId: number,
-    @Query('email') email: string,
+    // @Query("email") email: string,
     @Res() res: Response,
   ) {
     try {
-      const members = await this.cartService.getMembersInBoard(boardId, email);
+      const members = await this.cartService.getMembersInBoard(boardId);
       return res.status(200).json({
         success: true,
         message: members,
@@ -142,6 +125,7 @@ export class CartController {
     }
   }
 
+  @UseGuards(AuthenticationGuard)
   @Post('/addMember')
   async addMembers(
     @Body() addMemberDto: AddMemberDto,
@@ -149,7 +133,8 @@ export class CartController {
     @Res() res: Response,
   ) {
     try {
-      await this.cartService.addMembersInCart(addMemberDto);
+      const { id } = req.user;
+      await this.cartService.addMembersInCart(addMemberDto, id);
       return res.status(201).json({
         success: true,
         message: 'Member added successfully!',
@@ -181,10 +166,16 @@ export class CartController {
     }
   }
 
+  @UseGuards(AuthenticationGuard)
   @Get('/getCartById/:cartId')
-  async getCartById(@Param('cartId') cartId: number, @Res() res: Response) {
+  async getCartById(
+    @Param('cartId') cartId: number,
+    @Req() req: CustomRequest,
+    @Res() res: Response,
+  ) {
     try {
-      const cart = await this.cartService.getCartById(cartId);
+      const { id } = req.user;
+      const cart = await this.cartService.getCartById(cartId, id);
       return res.status(200).json({
         success: true,
         message: cart,
@@ -197,14 +188,18 @@ export class CartController {
     }
   }
 
+  @UseGuards(AuthenticationGuard)
   @Post('/addChecklist')
   async addChecklistIntoCart(
+    @Req() req: CustomRequest,
     @Body() createCartChecklistDto: CreateCartChecklistDto,
     @Res() res: Response,
   ) {
     try {
+      const { id } = req.user;
       const checklist = await this.cartService.addChecklistIntoCart(
         createCartChecklistDto,
+        id,
       );
       return res.status(201).json({
         success: true,
@@ -327,12 +322,31 @@ export class CartController {
     }
   }
 
+  @Get('/getAllCommentsOfCart/:cartId')
+  async getAllCommentsOfCart(
+    @Param('cartId') cartId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      const comments = await this.cartService.getAllCommentsOfACart(cartId);
+      return res.status(200).json({
+        success: true,
+        message: comments,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
   @UseGuards(AuthenticationGuard)
   @Post('/attachFile')
   // @UseInterceptors(FileFieldsInterceptor([
   //   { name: 'files', maxCount: 10 },
   // ]))
-  @UseInterceptors(FilesInterceptor('files'))
+  @UseInterceptors(FilesInterceptor('attachment_url'))
   async createAttachment(
     @Req() req: CustomRequest,
     @UploadedFiles() files: Array<Express.Multer.File>,
@@ -387,6 +401,64 @@ export class CartController {
       return res.status(201).json({
         success: true,
         message: 'Cart successfully moved to the next cart',
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getAllCartsOfBoard/:boardId')
+  async getAllCartsOfABoard(
+    @Param('boardId') boardId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      const carts = await this.cartService.getAllCartsOfABoard(boardId);
+      return res.status(200).json({
+        success: true,
+        message: carts,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getAttachmentsOfCart/:cartId')
+  async getAttachmentsOfACart(
+    @Param('cartId') cartId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      const attachments =
+        await this.cartService.getAllAttachmentsOfCart(cartId);
+      return res.status(200).json({
+        success: true,
+        message: attachments,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/getHistoryOfCart/:cartId')
+  async getHistoryOfACart(
+    @Param('cartId') cartId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      const history = await this.cartService.getHistoryOfCart(cartId);
+      return res.status(200).json({
+        success: true,
+        message: history,
       });
     } catch (error) {
       return res.status(400).json({

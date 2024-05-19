@@ -18,6 +18,7 @@ import { UserTimeTrackerEntity } from './user-time-tracker.entity';
 import { CommentEntity } from './comment.entity';
 import { AttachmentEntity } from './attachment.entity';
 import { BoardFlowEntity } from 'src/board/entities/board-flow.entity';
+import { CartHistoryEntity } from './cart-history.entity';
 
 @Entity('cart')
 export class CartEntity {
@@ -76,6 +77,9 @@ export class CartEntity {
   @ManyToOne(() => BoardFlowEntity, (boardFlow) => boardFlow.id)
   @JoinColumn({ name: 'flow_id', referencedColumnName: 'id' })
   flow_id: BoardFlowEntity;
+
+  @OneToMany(() => CartHistoryEntity, (cart_history) => cart_history.cart_id)
+  cart_history: CartHistoryEntity[];
 
   @CreateDateColumn()
   created_at: Date;

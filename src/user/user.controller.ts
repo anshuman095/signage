@@ -1,24 +1,28 @@
-import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import {
   Controller,
   Get,
   Post,
   Body,
   Param,
-  Delete,
   ValidationPipe,
+  Req,
   Res,
   Query,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-// import { UpdateUserDto } from "./dto/update-user.dto";
 import { CreateLoginDto } from './dto/create-login.dto';
 import { EmailService } from 'src/utility/email.service';
+import { AuthenticationGuard } from 'src/auth/authentication.guard';
+import { ApiBadRequestResponse, ApiCreatedResponse } from '@nestjs/swagger';
 
+interface CustomRequest extends Request {
+  user: { id: number; email: string };
+}
 @Controller('/user')
 export class UserController {
   constructor(
@@ -27,6 +31,14 @@ export class UserController {
   ) {}
 
   @Post('create')
+  @ApiCreatedResponse({
+    description: 'User created successfully',
+    type: CreateUserDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'User creation failed',
+    type: CreateUserDto,
+  })
   async create(
     @Body(new ValidationPipe()) createUserDto: CreateUserDto,
     @Res() res: Response,
@@ -35,10 +47,6 @@ export class UserController {
       if (createUserDto.password !== createUserDto.confirm_password) {
         throw new Error('Password and confirm password does not match');
       }
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
-      createUserDto.password = hashedPassword;
-
       const addedUser = await this.userService.createUser(createUserDto);
       return res.status(201).json({
         success: true,
@@ -91,7 +99,7 @@ export class UserController {
       const result = await this.userService.login(createLogionDto);
       return res.status(200).json({
         success: true,
-        message: 'User logged in',
+        message: 'User logged in successfully',
         result: result,
       });
     } catch (err) {
@@ -121,7 +129,7 @@ export class UserController {
         const emailData = {
           subject: 'Password Reset',
           html: `<p>Click the following link to reset your password:</p>
-          <a href="${resetUrl}/${resetToken}">Reset Password</a>`,
+          <a href="${resetUrl}/${resetToken}" style="color: blue">Reset Password</a>`,
         };
         await this.emailService.sendEmail(createUserDto.email, emailData);
 
@@ -151,7 +159,9 @@ export class UserController {
   ) {
     try {
       if (createUserDto.password !== createUserDto.confirm_password) {
-        throw new BadRequestException('Passwords do not match');
+        throw new BadRequestException(
+          'Password and confrim password do not match',
+        );
       }
 
       const { email } = this.userService.verifyResetToken(token);
@@ -171,9 +181,15 @@ export class UserController {
     }
   }
 
+  @UseGuards(AuthenticationGuard)
   @Get('/search')
-  async searchUserByEmail(@Query('email') email: string, @Res() res: Response) {
+  async searchUserByEmail(
+    @Req() req: CustomRequest,
+    @Query('email') email: string,
+    @Res() res: Response,
+  ) {
     try {
+      const { id } = req.user;
       if (!email || email.length < 3) {
         return res.status(400).json({
           success: false,
@@ -181,19 +197,18 @@ export class UserController {
         });
       }
 
-      const users = await this.userService.searchUsersByEmail(email);
+      const users = await this.userService.searchUsersByEmail(email, id);
 
       if (users.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'No results found',
+        return res.status(200).json({
+          success: true,
+          message: [],
         });
       }
 
       return res.status(200).json({
         success: true,
-        message: 'Users found successfully',
-        result: users,
+        message: users,
       });
     } catch (err) {
       return res.status(500).json({
@@ -203,23 +218,21 @@ export class UserController {
     }
   }
 
-  @Get()
-  findAll() {
-    return this.userService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
-  }
-
-  // @Patch(":id")
-  // update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
-  //   return this.userService.update(+id, updateUserDto);
-  // }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @Get('/getUserDetails')
+  @UseGuards(AuthenticationGuard)
+  async getUserDetails(@Req() req: CustomRequest, @Res() res: Response) {
+    try {
+      const { id } = req.user;
+      const user = await this.userService.getDetailsOfLoginUser(id);
+      return res.status(200).json({
+        success: true,
+        message: user,
+      });
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
   }
 }

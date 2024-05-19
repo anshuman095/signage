@@ -1,16 +1,25 @@
 import { Response } from 'express';
-import { Controller, Post, Body, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Query,
+  Res,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { InviteService } from './invite.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
-// import { Roles } from 'src/decorators/roles.decorators';
 import { AuthenticationGuard } from 'src/auth/authentication.guard';
-// import { AuthorizationGuard } from 'src/auth/authorization.guard';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from 'src/user/entities/user.entity';
 import { ConfrimInvitationDto } from './dto/confirm-invite.dto';
 import { EmailService } from 'src/utility/email.service';
 
+interface CustomRequest extends Request {
+  user: { id: number; email: string };
+}
 @Controller('invitation')
 export class InviteController {
   constructor(
@@ -23,40 +32,51 @@ export class InviteController {
   // @Roles(['SUPERADMIN'])
   @UseGuards(AuthenticationGuard)
   @Post()
-  async create(
+  async createInvitation(
+    @Req() req: CustomRequest,
     @Body() createInviteDto: CreateInviteDto,
     @Query('userId') userId: number,
     @Query('email') email: string,
     @Res() res: Response,
   ) {
     try {
+      // const {id} = req.user;
       if (userId) {
         const user = await this.userRepository.findOneBy({ id: userId });
         if (user) {
-          await this.inviteService.sendInvitation(createInviteDto, user);
+          const data = await this.inviteService.sendInvitation(
+            createInviteDto,
+            user,
+          );
           return res.status(201).json({
             success: true,
             message: 'Invitation sent successfully!',
+            invite: data,
           });
         } else {
           throw new Error('User does not exist');
         }
       } else {
-        console.log('email-->', email);
+        const user = await this.userRepository.findOneBy({ email: email });
+        if (user) {
+          throw new Error('User already registered');
+        }
 
-        await this.inviteService.sendInvitation(createInviteDto, email);
-        const registrationLink = process.env.REGESTRATION_URL;
+        const message = await this.inviteService.sendInvitation(
+          createInviteDto,
+          email,
+        );
+        // const registrationLink = process.env.REGESTRATION_URL;
 
-        const emailData = {
-          subject: 'Registration Link',
-          html: `Please click the following link to register your email: ${email} <a href="${registrationLink}">${registrationLink}</a> `,
-        };
-        console.log('email--->', email);
+        // const emailData = {
+        //   subject: "Registration Link",
+        //   html: `Please click the following link to register your email: ${email} <a href="${registrationLink}" style="color: blue">Register here</a>. `,
+        // };
 
-        await this.emailService.sendEmail(email, emailData);
+        // await this.emailService.sendEmail(email, emailData);
         return res.status(200).json({
           success: true,
-          message: 'Regestration Link Send Successfully!',
+          message: message,
         });
       }
     } catch (err) {
@@ -75,7 +95,7 @@ export class InviteController {
     try {
       const { inviteId, user_id, user_email, board_id } = confirmInviteDto;
 
-      const confirmedInvite = await this.inviteService.confirmInvitation(
+      await this.inviteService.confirmInvitation(
         inviteId,
         user_id,
         user_email,
@@ -85,7 +105,6 @@ export class InviteController {
       return res.status(200).json({
         success: true,
         message: 'Invitation confirmed successfully!',
-        data: confirmedInvite,
       });
     } catch (err) {
       return res.status(400).json({

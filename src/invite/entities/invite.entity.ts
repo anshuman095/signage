@@ -31,7 +31,12 @@ export class InviteEntity {
   @Column({ type: 'varchar', length: 30, nullable: true })
   user_email: string;
 
-  @Column({ type: 'enum', nullable: true, enum: Status })
+  @Column({
+    type: 'enum',
+    nullable: true,
+    enum: Status,
+    default: Status.PENDING,
+  })
   status: Status;
 
   @Column({ type: 'varchar', nullable: true, default: false })

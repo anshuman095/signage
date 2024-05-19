@@ -12,11 +12,9 @@ import {
   ValidationPipe,
   UseInterceptors,
   UploadedFile,
-  // ParseFilePipe,
-  // MaxFileSizeValidator,
-  // FileTypeValidator,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { BoardService } from './board.service';
 import { CreateBoardDto } from './dto/create-board.dto';
@@ -27,6 +25,7 @@ import { AuthenticationGuard } from 'src/auth/authentication.guard';
 import { AuthorizationGuard } from 'src/auth/authorization.guard';
 import { CreateBoardFlowDto } from './dto/create-board-flow.dto';
 import { AddMemberInBoardflowDto } from './dto/add-member-boardflow.dto';
+import { UpdateBoardFlowDto } from './dto/update-board-flow.dto';
 
 interface CustomRequest extends Request {
   user: { id: number; email: string };
@@ -47,7 +46,7 @@ export class BoardController {
     @Body(new ValidationPipe()) createBoardDto: CreateBoardDto,
     @Req() req: CustomRequest,
     @Res() res: Response,
-    @UploadedFile() // new ParseFilePipe({
+    @UploadedFile()
     file: Express.Multer.File,
   ) {
     try {
@@ -55,10 +54,8 @@ export class BoardController {
       if (!createBoardDto.boardName) {
         throw new Error('Board Name is required');
       }
-      // if (createBoardDto.logo) {
       const result = await this.cloudinaryService.uploadSingleFile(file.buffer);
       createBoardDto.logo = result.secure_url;
-      // }
       const board = await this.boardService.createBoard(createBoardDto, id);
       return res.status(201).json({
         success: true,
@@ -84,7 +81,7 @@ export class BoardController {
     file: Express.Multer.File,
   ) {
     try {
-      if (updateBoardDto?.logo) {
+      if (file) {
         const result = await this.cloudinaryService.uploadSingleFile(
           file.buffer,
         );
@@ -92,6 +89,7 @@ export class BoardController {
       }
 
       await this.boardService.updateBoard(+id, updateBoardDto);
+
       return res.status(201).json({
         success: true,
         message: 'Updated Successfully',
@@ -108,7 +106,8 @@ export class BoardController {
   @Get('/getAllBoards')
   async getAllBoards(@Req() req: CustomRequest, @Res() res: Response) {
     try {
-      const boards = await this.boardService.getAllBoards();
+      const { id } = req.user;
+      const boards = await this.boardService.getAllBoards(id);
       return res.status(200).json({
         success: true,
         message: boards,
@@ -124,10 +123,16 @@ export class BoardController {
   // @Roles(["SUPERADMIN"])
   @UseGuards(AuthenticationGuard)
   @Get('/getMyBoards')
-  async getMyBoards(@Req() req: CustomRequest, @Res() res: Response) {
+  async getMyBoards(
+    @Req() req: CustomRequest,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Res() res: Response,
+  ) {
     try {
       const { id } = req.user;
-      const boards = await this.boardService.getMyBoards(id);
+      const paginationOptions = { page, limit };
+      const boards = await this.boardService.getMyBoards(id, paginationOptions);
       return res.status(200).json({
         success: true,
         message: boards,
@@ -216,7 +221,7 @@ export class BoardController {
 
   @Roles(['SUPERADMIN'])
   @UseGuards(AuthenticationGuard, AuthorizationGuard)
-  @Get('/getUsersInBoard/:boardId')
+  @Get('/get/users/:boardId')
   async getUsersInABoard(
     @Res() res: Response,
     @Param('boardId') boardId: number,
@@ -237,17 +242,17 @@ export class BoardController {
 
   @Roles(['SUPERADMIN'])
   @UseGuards(AuthenticationGuard, AuthorizationGuard)
-  @Delete('/removeUserFromBoard/:boardId/:userId')
+  @Delete('/removeUserFromBoard/:boardId/:userEmail')
   async removeUserFromBoard(
     @Res() res: Response,
     @Param('boardId') boardId: number,
-    @Param('userId') userId: number,
+    @Param('userEmail') userEmail: string,
   ) {
     try {
-      await this.boardService.removeUserFromBoard(boardId, userId);
+      await this.boardService.removeUserFromBoard(boardId, userEmail);
       return res.status(200).json({
         success: true,
-        message: 'User removed from the board successfully',
+        message: 'User removed successfully',
       });
     } catch (error) {
       return res.status(400).json({
@@ -280,7 +285,6 @@ export class BoardController {
     }
   }
 
-  // @Get("/getUsersInBoard/:boardId")
   @Post('/addMembersInBoardFlow')
   async addMembersInBoardFlow(
     @Body() addMemberInBoardflowDto: AddMemberInBoardflowDto,
@@ -291,6 +295,31 @@ export class BoardController {
       return res.status(201).json({
         success: true,
         message: 'User added successfully!',
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Patch('/update/boardFlow/:boardId/:flowId')
+  async updateBoardFlow(
+    @Param('boardId') boardId: number,
+    @Param('flowId') flowId: number,
+    @Body() updateBoardFlowDto: UpdateBoardFlowDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const updatedBoardFlow = await this.boardService.updateBoardFlow(
+        boardId,
+        flowId,
+        updateBoardFlowDto,
+      );
+      return res.send(201).json({
+        success: true,
+        message: updatedBoardFlow,
       });
     } catch (error) {
       return res.status(400).json({

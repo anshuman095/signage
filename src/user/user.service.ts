@@ -4,17 +4,29 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
-// import { UpdateUserDto } from './dto/update-user.dto';
-import { UserEntity } from './entities/user.entity';
+import { Role, UserEntity } from './entities/user.entity';
 import { CreateLoginDto } from './dto/create-login.dto';
 import { EmailService } from 'src/utility/email.service';
+import { InviteEntity, Status } from 'src/invite/entities/invite.entity';
+import { UserBoardEntity } from 'src/board/entities/user-board.entity';
+import { BoardEntity } from 'src/board/entities/board.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
+
     private readonly emailService: EmailService,
+
+    @InjectRepository(InviteEntity)
+    private inviteRepository: Repository<InviteEntity>,
+
+    @InjectRepository(BoardEntity)
+    private boardRepository: Repository<BoardEntity>,
+
+    @InjectRepository(UserBoardEntity)
+    private userBoardRepository: Repository<UserBoardEntity>,
   ) {}
 
   get UserRepository(): Repository<UserEntity> {
@@ -45,10 +57,41 @@ export class UserService {
 
       const emailData = {
         subject: 'Email Verification',
-        html: `Please click the following link to verify your email: ${createUserDto.email} <a href="${verificationLink}?token=${token}">${verificationLink}
+        html: `Please click the following link to verify your email: ${createUserDto.email} <a href="${verificationLink}?token=${token}" style="color: blue">Verification Link
         </a>`,
       };
       await this.emailService.sendEmail(createUserDto.email, emailData);
+      delete userData.password;
+
+      const invite = await this.inviteRepository.findOne({
+        where: { user_email: userData.email },
+        relations: ['user_id', 'board_id'],
+      });
+      console.log('invite', invite);
+
+      if (invite) {
+        await this.inviteRepository.update(invite.id, {
+          status: Status.CONFIRM,
+          user_id: { id: userData.id },
+        });
+        const board = await this.boardRepository.findOne({
+          where: { id: invite?.board_id?.id },
+          relations: ['users'],
+        });
+        if (!board) {
+          throw new Error('Board not found');
+        }
+        board.users = [...board?.users, userData];
+        await this.boardRepository.save(board);
+        const user_board = this.userBoardRepository.create({
+          is_active: true,
+          status: 'active',
+          board_id: invite.board_id,
+          user_id: userData,
+        });
+        await this.userBoardRepository.save(user_board);
+      }
+
       return userData;
     }
   }
@@ -81,10 +124,10 @@ export class UserService {
         delete user.password;
         return { token, user };
       } else {
-        throw new Error('Incorrect email or password');
+        throw new Error('Incorrect password');
       }
     } else {
-      throw new Error('User not found');
+      throw new Error('Incorrect email');
     }
   }
 
@@ -111,27 +154,28 @@ export class UserService {
     }
   }
 
-  async searchUsersByEmail(email: string) {
-    const users = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.email LIKE :email', { email: `%${email}%` })
-      .getMany();
-    return users;
+  async searchUsersByEmail(email: string, userId: number) {
+    try {
+      const users = await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.email LIKE :email', { email: `%${email}%` })
+        .andWhere('user.role != :role', { role: Role.SUPERADMIN })
+        .andWhere('user.id != :userId', { userId: userId })
+        .getMany();
+      return users;
+    } catch (error) {
+      throw new Error(error.message);
+    }
   }
 
-  findAll() {
-    return `This action returns all user`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
-  }
-
-  // update(id: number, updateUserDto: UpdateUserDto) {
-  //   return `This action updates a #${id} user`;
-  // }
-
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async getDetailsOfLoginUser(user_id: number) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: user_id },
+      });
+      return user;
+    } catch (error) {
+      throw new Error(error.message);
+    }
   }
 }

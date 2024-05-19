@@ -1,8 +1,10 @@
+import * as bcrypt from 'bcrypt';
 import { BoardFlowEntity } from 'src/board/entities/board-flow.entity';
 import { BoardEntity } from 'src/board/entities/board.entity';
 import { CartChecklistEntity } from 'src/cart/entities/cart-checklist.entity';
 import { CartEntity } from 'src/cart/entities/cart.entity';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -17,11 +19,11 @@ export enum Role {
   USER = 'USER',
 }
 
-export enum StatusUser {
-  INACTIVE = 'INACTIVE',
-  PENDING = 'PENDING',
-  ACTIVE = 'ACTIVE',
-}
+// export enum StatusUser {
+//   INACTIVE = "INACTIVE",
+//   PENDING = "PENDING",
+//   ACTIVE = "ACTIVE",
+// }
 
 export enum TaskStatus {
   TODO = 'TODO',
@@ -39,7 +41,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 30 })
   lName: string;
 
-  @Column({ type: 'varchar', unique: true, length: 20 })
+  @Column({ type: 'varchar', unique: true, length: 30, nullable: true })
   email: string;
 
   @Column({ type: 'varchar', select: false })
@@ -51,13 +53,13 @@ export class UserEntity {
   @Column({ type: 'boolean', default: false, nullable: true })
   isEmailVerified: boolean;
 
-  @Column({
-    type: 'enum',
-    nullable: true,
-    default: StatusUser.INACTIVE,
-    enum: StatusUser,
-  })
-  status: StatusUser;
+  // @Column({
+  //   type: "enum",
+  //   nullable: true,
+  //   default: StatusUser.INACTIVE,
+  //   enum: StatusUser,
+  // })
+  // status: StatusUser;
 
   @Column({ type: 'varchar', nullable: true })
   emailVerificationToken: string;
@@ -77,7 +79,7 @@ export class UserEntity {
   boards: BoardEntity;
 
   @ManyToMany(() => CartEntity, (cart) => cart.members)
-  cart_members: CartEntity;
+  cart_members: CartEntity[];
 
   @ManyToMany(
     () => CartChecklistEntity,
@@ -86,11 +88,17 @@ export class UserEntity {
   checklist_members: CartChecklistEntity;
 
   @ManyToMany(() => BoardFlowEntity, (boardFlow) => boardFlow.users)
-  flows: BoardFlowEntity[];
+  flows: BoardFlowEntity;
 
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @BeforeInsert()
+  async hashPassword() {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 }
